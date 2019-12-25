@@ -28,7 +28,7 @@ app.use(cookieSession({
 }))
 
 app.use(function (req, res, next) {
-  res.set('Content-Type', 'application/json; charset=utf-8')
+  res.header('Content-Type', 'application/json; charset=utf-8')
   next()
 })
 

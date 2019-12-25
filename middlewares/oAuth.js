@@ -35,7 +35,6 @@ const oAuth = async (req, res, next) => {
     }
     res.send(failed({code: 100, data: 'token过期，请重新登陆'}))
   })
-  
 }
 
 module.exports = oAuth

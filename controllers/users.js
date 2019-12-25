@@ -1,5 +1,5 @@
 const userModel = require('../models/users')
-const bcrypt = require('bcrypt')
+const bcrypt = require('bcryptjs')
 const { success, failed } = require('../utils/send')
 const jwt = require('jsonwebtoken')
 const fs = require('fs')
@@ -13,26 +13,17 @@ class UsersController {
   }
   // 密码加密
   _hashPassword(pwd) {
-    return new Promise((res, rej) => {
-      bcrypt.hash(pwd, 10, (err, hash) => {
-        if(!err) {
-          res(hash)
-        } else {
-          rej(err)
-        }
-      })
+    return new Promise((res) => {
+      let salt = bcrypt.genSaltSync(10)
+      let hash = bcrypt.hashSync(pwd, salt)
+      res(hash)
     })
   }
   //密码比对
   _comparePassword(pwd, hash) {
-    return new Promise((res, rej) => {
-      bcrypt.compare(pwd, hash, (err, result) => {
-        if(!err) {
-          res(result)
-        } else {
-          rej(err)
-        }
-      })
+    return new Promise((res) => {
+      let compareRes = bcrypt.compareSync(pwd, hash)
+      res(compareRes)
     })
   }
   // 生成jwt token
@@ -54,6 +45,7 @@ class UsersController {
       return
     }
     let hash = await this._hashPassword(password)
+    console.log(hash)
     let result = await userModel.save({
       username,
       password: hash
@@ -81,6 +73,7 @@ class UsersController {
       return
     }
     let compareRes = await this._comparePassword(password, result.password) 
+    console.log(compareRes)
     // 密码没有比对成功
     if(!compareRes) {
       res.send(failed({data: '登陆密码错误'}))
@@ -161,13 +154,28 @@ class UsersController {
       headPath = file.path
     })
     form.on('close', async () => {
-      let pathArr = headPath.split('/')
+      let pathArr
+      if(/public\\uploadHead\\/.test(headPath)) {
+        pathArr = headPath.split('\\')
+      } else {
+        pathArr = headPath.split('/')
+      }
       let head = pathArr[pathArr.length - 1]
-      let result = await userModel.updateOne({username, _id, head, type: 'head'})
+      let newHead = _id + '-img-' + head
+      fs.renameSync(path.resolve(__dirname, `../public/uploadHead/${head}`), path.resolve(__dirname, `../public/uploadHead/${newHead}`))
+      let result = await userModel.updateOne({username, _id, head: newHead, type: 'head'})
+      let files = fs.readdirSync(path.resolve(__dirname, '../public/uploadHead'))
+      // console.log(files, head)
       if(result.nModified === 1 && result.n === 1) {
+        files.forEach((t) => {
+          if(t !== newHead && t.indexOf(_id+"-img-") > -1) {
+            fs.unlinkSync(path.resolve(__dirname, `../public/uploadHead/${t}`))
+          }
+        })
         res.send(success({data: '头像上传成功'}))
         return
       }
+      fs.unlinkSync(path.resolve(__dirname, `../public/uploadHead/${newHead}`))
       res.send(failed({data: '头像上传失败'}))
     })
     form.on('error', (err) => {
